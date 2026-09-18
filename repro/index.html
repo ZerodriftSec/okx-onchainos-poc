@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OnchainOS · Agentic Wallet — PoC</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --bg-soft: #161b22;
+    --bg-card: #1c2128;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-dim: #8b949e;
+    --accent: #4f8ff7;
+    --accent-soft: #1f3a5f;
+    --danger: #f85149;
+    --danger-soft: #3d1d1b;
+    --ok: #3fb950;
+    --think: #a371f7;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, "Segoe UI", "Inter", sans-serif;
+    height: 100vh; display: flex; overflow: hidden;
+  }
+  /* ── sidebar ── */
+  .sidebar {
+    width: 250px; background: var(--bg-soft); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; padding: 16px 12px; gap: 8px;
+    transition: width .25s ease, padding .25s ease; overflow: hidden; white-space: nowrap;
+  }
+  .sidebar.collapsed { width: 0; padding: 0; border-right: none; }
+  .sidebar.collapsed > * { opacity: 0; }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 16px; }
+  .brand .logo {
+    width: 30px; height: 30px; border-radius: 8px;
+    background: linear-gradient(135deg, #4f8ff7, #a371f7);
+    display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px;
+  }
+  .brand .name { font-weight: 600; font-size: 15px; }
+  .brand .name small { display: block; font-weight: 400; color: var(--text-dim); font-size: 11px; }
+  .session {
+    padding: 10px 12px; border-radius: 8px; background: var(--accent-soft);
+    border: 1px solid #2c4a75; font-size: 13px; cursor: default;
+  }
+  .session b { font-size: 13px; }
+  .session .meta { color: var(--text-dim); font-size: 11px; margin-top: 3px; }
+  .sidebar .spacer { flex: 1; }
+  .modelbox {
+    padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--bg-card); font-size: 12px; color: var(--text-dim);
+  }
+  .modelbox .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); margin-right: 6px; }
+  .modelbox b { color: var(--text); }
+  /* ── main ── */
+  .main { flex: 1; display: flex; flex-direction: column; }
+  .topbar {
+    padding: 12px 24px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px; background: var(--bg-soft);
+  }
+  .topbar .title { font-size: 14px; font-weight: 600; }
+  .sidebtn {
+    width: 30px; height: 30px; border-radius: 8px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-dim); font-size: 16px; user-select: none;
+  }
+  .sidebtn:hover { background: var(--bg-card); color: var(--text); }
+  .topbar .chain {
+    font-size: 11px; padding: 3px 10px; border-radius: 99px;
+    background: var(--bg-card); border: 1px solid var(--border); color: var(--text-dim);
+  }
+  .chat { flex: 1; overflow-y: auto; padding: 24px 8%; }
+  .msg { margin-bottom: 20px; display: flex; }
+  .msg.user { justify-content: flex-end; }
+  .msg.user .bubble {
+    background: var(--accent-soft); border: 1px solid #2c4a75;
+    padding: 10px 16px; border-radius: 14px 14px 4px 14px; max-width: 70%;
+    font-size: 14px; line-height: 1.55; white-space: pre-wrap;
+    word-break: break-all; overflow-wrap: anywhere;
+  }
+  .agent-col { max-width: 88%; width: 100%; min-width: 0; }
+  .agent-avatar {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+    font-size: 12px; color: var(--text-dim);
+  }
+  .agent-avatar .a {
+    width: 22px; height: 22px; border-radius: 6px;
+    background: linear-gradient(135deg, #4f8ff7, #a371f7);
+    display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700;
+  }
+  /* thinking block */
+  .think {
+    border-left: 3px solid var(--think); background: rgba(163,113,247,0.07);
+    padding: 10px 14px; border-radius: 0 8px 8px 0; margin: 6px 0 10px 30px;
+    color: #c9a8ff; font-size: 13px; line-height: 1.6; white-space: pre-wrap;
+  }
+  .think::before { content: "💭 Thinking"; display: block; font-size: 11px; color: var(--think); margin-bottom: 4px; letter-spacing: .5px; }
+  /* tool call card */
+  .toolcard {
+    border: 1px solid var(--border); border-radius: 10px; margin: 6px 0 10px 30px;
+    background: var(--bg-card); overflow: hidden; max-width: 100%; min-width: 0;
+  }
+  .toolcard.risk { border-color: var(--danger); box-shadow: 0 0 0 1px rgba(248,81,73,.25); }
+  .toolcard.ok { border-color: rgba(63,185,80,.5); }
+  .toolhead {
+    display: flex; align-items: center; gap: 8px; padding: 8px 14px;
+    background: var(--bg-soft); border-bottom: 1px solid var(--border);
+    font-family: var(--mono); font-size: 12px; color: var(--accent); cursor: pointer;
+  }
+  .toolhead .ico { color: var(--text-dim); flex-shrink: 0; }
+  .toolhead .cmd { flex: 1; min-width: 0; overflow-wrap: anywhere; word-break: break-all; }
+  .toolhead .status { margin-left: auto; font-size: 10px; color: var(--text-dim); flex-shrink: 0; }
+  .toolhead { overflow: hidden; }
+  .toolcard.risk .toolhead .status { color: var(--danger); font-weight: 700; }
+  .toolcard.ok .toolhead .status { color: var(--ok); font-weight: 700; }
+  .toolout {
+    padding: 10px 14px; font-family: var(--mono); font-size: 11.5px;
+    color: var(--text-dim); white-space: pre-wrap; word-break: break-all;
+    max-height: 200px; overflow-y: auto; line-height: 1.5;
+  }
+  .toolout .hl-risk { color: var(--danger); }
+  .toolout .hl-tx { color: var(--ok); }
+  /* assistant bubble */
+  .agent-bubble {
+    background: var(--bg-card); border: 1px solid var(--border);
+    padding: 12px 18px; border-radius: 4px 14px 14px 14px;
+    font-size: 14px; line-height: 1.65; white-space: pre-wrap;
+    word-break: break-all; overflow-wrap: anywhere;
+  }
+  .agent-bubble b { color: var(--accent); font-size: 16px; }
+  .agent-bubble code { background: var(--bg-soft); padding: 1px 6px; border-radius: 5px; font-family: var(--mono); font-size: 12px; color: var(--ok); word-break: break-all; }
+  .agent-bubble.warn { border-color: var(--danger); background: var(--danger-soft); }
+  .cursor { display: inline-block; width: 8px; background: var(--accent); animation: blink 1s step-start infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  /* typing indicator */
+  .typing { display: flex; gap: 4px; padding: 12px 0; margin-left: 30px; }
+  .typing span { width: 7px; height: 7px; border-radius: 50%; background: var(--text-dim); animation: bounce 1.2s infinite; }
+  .typing span:nth-child(2) { animation-delay: .15s; } .typing span:nth-child(3) { animation-delay: .3s; }
+  @keyframes bounce { 30% { transform: translateY(-5px); opacity: .5; } }
+  /* input */
+  .inputbar { padding: 16px 8% 20px; border-top: 1px solid var(--border); background: var(--bg-soft); }
+  .inputwrap {
+    display: flex; gap: 10px; background: var(--bg-card);
+    border: 1px solid var(--border); border-radius: 12px; padding: 6px 6px 6px 16px; align-items: center;
+  }
+  .inputwrap:focus-within { border-color: var(--accent); }
+  .inputwrap input {
+    flex: 1; background: none; border: none; outline: none; color: var(--text);
+    font-size: 14px; padding: 10px 0; font-family: inherit;
+  }
+  .inputwrap button {
+    background: var(--accent); border: none; color: #fff; border-radius: 9px;
+    padding: 9px 20px; font-size: 13px; cursor: pointer; font-weight: 600;
+  }
+  .inputwrap button:disabled { opacity: .4; cursor: not-allowed; }
+  .hint { font-size: 11px; color: var(--text-dim); margin-top: 8px; text-align: center; }
+  ::-webkit-scrollbar { width: 8px; } ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+</style>
+</head>
+<body>
+  <div class="sidebar collapsed" id="sidebar">
+    <div class="brand">
+      <div class="logo">O</div>
+      <div class="name">OnchainOS<small>Agentic Wallet</small></div>
+    </div>
+    <div class="session">
+      <b>Wallet Assistant</b>
+      <div class="meta">Signed in · acct-main · AK mode</div>
+    </div>
+    <div class="spacer"></div>
+    <div class="modelbox"><span class="dot"></span><b>Agent</b> · online<br>session active</div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="sidebtn" id="sidebar-toggle" onclick="toggleSidebar()">☰</div>
+      <div class="title">Wallet Assistant</div>
+      <div class="chain" id="status">Ready</div>
+    </div>
+
+    <div class="chat" id="chat">
+      <div class="msg agent"><div class="agent-col">
+        <div class="agent-avatar"><div class="a">A</div><span>OnchainOS Agent</span></div>
+        <div class="agent-bubble">Hi, I'm your on-chain wallet assistant. I can check balances, send transfers, or call contracts. How can I help?</div>
+      </div></div>
+    </div>
+
+    <div class="inputbar">
+      <div class="inputwrap">
+        <input id="input" placeholder="Type a message, e.g. check my balance" autocomplete="off">
+        <button id="send" onclick="send()">Send</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+const chat = document.getElementById('chat');
+const input = document.getElementById('input');
+const sendBtn = document.getElementById('send');
+const statusEl = document.getElementById('status');
+let busy = false;
+let es = null;   // single EventSource; close before reopening
+
+function scrollBottom() { chat.scrollTop = chat.scrollHeight; }
+
+function addUserMsg(text) {
+  const div = document.createElement('div');
+  div.className = 'msg user';
+  div.innerHTML = `<div class="bubble"></div>`;
+  div.querySelector('.bubble').textContent = text;
+  chat.appendChild(div); scrollBottom();
+}
+
+let current = null;   // { thinkEl, toolCard, outEl, msgEl }
+
+function agentCol() {
+  const div = document.createElement('div');
+  div.className = 'msg agent';
+  const col = document.createElement('div');
+  col.className = 'agent-col';
+  col.innerHTML = `<div class="agent-avatar"><div class="a">A</div><span>OnchainOS Agent</span></div>`;
+  div.appendChild(col); chat.appendChild(div);
+  return col;
+}
+
+function newThink() {
+  const el = document.createElement('div');
+  el.className = 'think'; el.style.display = 'none';
+  current.col.appendChild(el);
+  return el;
+}
+
+function newToolCard(cmd) {
+  const card = document.createElement('div');
+  card.className = 'toolcard';
+  const head = document.createElement('div');
+  head.className = 'toolhead';
+  head.innerHTML = `<span class="ico">⌘</span><span class="cmd"></span><span class="status">Running…</span>`;
+  head.querySelector('.cmd').textContent = cmd;
+  head.onclick = () => { const o = card.querySelector('.toolout'); o.style.display = o.style.display === 'none' ? 'block' : 'none'; };
+  const out = document.createElement('div');
+  out.className = 'toolout';
+  card.appendChild(head); card.appendChild(out);
+  current.col.appendChild(card); scrollBottom();
+  return { card, out, head };
+}
+
+function newBubble(warn) {
+  const b = document.createElement('div');
+  b.className = 'agent-bubble' + (warn ? ' warn' : '');
+  current.col.appendChild(b); scrollBottom();
+  return b;
+}
+
+function handleEvent(ev) {
+  if (ev.type === 'turn_start') { /* user msg already added */ }
+  else if (ev.type === 'thinking') {
+    if (!current.think) { current.think = newThink(); }
+    current.think.style.display = 'block';
+    current.think.textContent += ev.text;
+    scrollBottom();
+  }
+  else if (ev.type === 'tool_start') {
+    current.think = null;
+    const t = newToolCard(ev.cmd);
+    current.tools = current.tools || [];
+    current.tools.push(t);
+    current.tool = t;
+    scrollBottom();
+  }
+  else if (ev.type === 'tool_output') {
+    const o = current.tool.out;
+    o.textContent += ev.chunk;
+    // highlight risk / tx lines
+    if (o.textContent.includes('81362') || o.textContent.includes('blocked')) { current.tool.card.classList.add('risk'); current.tool.head.querySelector('.status').textContent = '⚠ 81362 risk block'; }
+    scrollBottom();
+  }
+  else if (ev.type === 'tool_end') {
+    if (current.tool) {
+      const st = current.tool.head.querySelector('.status');
+      if (!current.tool.card.classList.contains('risk')) { st.textContent = 'Done ✓'; current.tool.card.classList.add('ok'); }
+      else { st.textContent = '⚠ blocked'; }
+      current.tool.out.style.maxHeight = '160px';
+    }
+  }
+  else if (ev.type === 'message') {
+    current.think = null; current.tool = null;
+    if (!current.bubble) { current.bubble = newBubble(ev.warn); }
+    current.bubble.textContent += ev.text + '\n';
+    scrollBottom();
+  }
+  else if (ev.type === 'done') {
+    busy = false; sendBtn.disabled = false; statusEl.textContent = 'Ready';
+  }
+}
+
+function send() {
+  const text = input.value.trim();
+  if (!text || busy) return;
+  input.value = '';
+  addUserMsg(text);
+  busy = true; sendBtn.disabled = true; statusEl.textContent = 'agent working…';
+
+  current = { col: agentCol(), think: null, tools: [], tool: null, bubble: null };
+  const typing = document.createElement('div');
+  typing.className = 'typing'; typing.innerHTML = '<span></span><span></span><span></span>';
+  current.col.appendChild(typing); scrollBottom();
+
+  fetch('/api/chat', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ message: text })
+  }).then(() => {
+    if (es) { es.close(); es = null; }   // kill zombie connections
+    es = new EventSource('/api/stream');
+    es.onmessage = (e) => {
+      const ev = JSON.parse(e.data);
+      if (typing.parentNode) typing.remove();
+      handleEvent(ev);
+      if (ev.type === 'done') { es.close(); es = null; }
+    };
+    es.onerror = () => { if (es) { es.close(); es = null; } };
+  });
+}
+
+input.addEventListener('keydown', (e) => { if (e.key === 'Enter') send(); });
+
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('collapsed');
+}
+</script>
+</body>
+</html>

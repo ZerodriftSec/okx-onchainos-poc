@@ -1,0 +1,19 @@
+# Local working clone of the affected repo (run.sh fetches its own copy)
+okx-onchainos-skills/
+
+# Drafts (not part of the PoC)
+okx-onchainos-writeup.md
+typefully-okx-thread.md
+
+# Runtime artifacts
+evidence/
+__pycache__/
+*.pyc
+.anvil/
+node_modules/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
