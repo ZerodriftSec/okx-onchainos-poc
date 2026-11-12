@@ -1,0 +1,3 @@
+Attention continuation QA
+Revision marker: B
+Protocol/source-identity test only; no security analysis or PoC execution.
